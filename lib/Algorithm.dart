@@ -1,7 +1,7 @@
 part of graphview;
 
 abstract class Algorithm {
-  EdgeRenderer? renderer;
+  EdgeRenderer get renderer;
 
   /// Executes the algorithm.
   /// @param shiftY Shifts the y-coordinate origin

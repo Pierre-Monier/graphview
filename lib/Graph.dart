@@ -32,15 +32,15 @@ class Graph {
 
     _nodes.remove(node);
 
-    _edges.removeWhere((edge) => edge.source == node || edge.destination == node);
+    _edges.removeWhere((edge) => edge.houseHold == node || edge.child == node);
 
     notifyGraphObserver();
   }
 
   void removeNodes(List<Node> nodes) => nodes.forEach((it) => removeNode(it));
 
-  Edge addEdge(Node source, Node destination, {Paint? paint}) {
-    final edge = Edge(source, destination, paint: paint);
+  Edge addEdge(HouseholdNode houseHold, Node child, {Paint? paint}) {
+    final edge = Edge(houseHold, child, paint: paint);
     addEdgeS(edge);
 
     return edge;
@@ -50,19 +50,19 @@ class Graph {
     var sourceSet = false;
     var destinationSet = false;
     _nodes.forEach((node) {
-      if (!sourceSet && node == edge.source) {
-        edge.source = node;
+      if (!sourceSet && node == edge.houseHold && node is HouseholdNode) {
+        edge.houseHold = node;
         sourceSet = true;
-      } else if (!destinationSet && node == edge.destination) {
-        edge.destination = node;
+      } else if (!destinationSet && node == edge.child) {
+        edge.child = node;
         destinationSet = true;
       }
     });
     if (!sourceSet) {
-      _nodes.add(edge.source);
+      _nodes.add(edge.houseHold);
     }
     if (!destinationSet) {
-      _nodes.add(edge.destination);
+      _nodes.add(edge.child);
     }
 
     if (!_edges.contains(edge)) {
@@ -78,28 +78,33 @@ class Graph {
   void removeEdges(List<Edge> edges) => edges.forEach((it) => removeEdge(it));
 
   void removeEdgeFromPredecessor(Node? predecessor, Node? current) {
-    _edges.removeWhere((edge) => edge.source == predecessor && edge.destination == current);
+    _edges.removeWhere(
+        (edge) => edge.houseHold == predecessor && edge.child == current);
   }
 
   bool hasNodes() => _nodes.isNotEmpty;
 
   Edge? getEdgeBetween(Node source, Node? destination) =>
-      _edges.firstWhereOrNull((element) => element.source == source && element.destination == destination);
+      _edges.firstWhereOrNull((element) =>
+          element.houseHold == source && element.child == destination);
 
-  bool hasSuccessor(Node? node) => _edges.any((element) => element.source == node);
+  bool hasSuccessor(Node? node) =>
+      _edges.any((element) => element.houseHold == node);
 
-  List<Node> successorsOf(Node? node) => getOutEdges(node!).map((e) => e.destination).toList();
+  List<Node> successorsOf(Node? node) =>
+      getOutEdges(node!).map((e) => e.child).toList();
 
-  bool hasPredecessor(Node node) => _edges.any((element) => element.destination == node);
+  bool hasPredecessor(Node node) =>
+      _edges.any((element) => element.child == node);
 
-  List<Node> predecessorsOf(Node? node) => getInEdges(node!).map((edge) => edge.source).toList();
+  List<Node> predecessorsOf(Node? node) =>
+      getInEdges(node!).map((edge) => edge.houseHold).toList();
 
   bool contains({Node? node, Edge? edge}) =>
-      node != null && _nodes.contains(node) || edge != null && _edges.contains(edge);
+      node != null && _nodes.contains(node) ||
+      edge != null && _edges.contains(edge);
 
 //  bool contains(Edge edge) => _edges.contains(edge);
-
-  bool containsData(data) => _nodes.any((element) => element.data == data);
 
   Node getNodeAtPosition(int position) {
     if (position < 0) {
@@ -114,16 +119,17 @@ class Graph {
     return _nodes[position];
   }
 
-  @Deprecated('Please use the builder and id mechanism to build the widgets')
-  Node getNodeAtUsingData(Widget data) => _nodes.firstWhere((element) => element.data == data);
+  Node getNodeUsingKey(ValueKey key) =>
+      _nodes.firstWhere((element) => element.key == key);
 
-  Node getNodeUsingKey(ValueKey key) => _nodes.firstWhere((element) => element.key == key);
+  Node getNodeUsingId(dynamic id) =>
+      _nodes.firstWhere((element) => element.key == ValueKey(id));
 
-  Node getNodeUsingId(dynamic id) => _nodes.firstWhere((element) => element.key == ValueKey(id));
+  List<Edge> getOutEdges(Node node) =>
+      _edges.where((element) => element.houseHold == node).toList();
 
-  List<Edge> getOutEdges(Node node) => _edges.where((element) => element.source == node).toList();
-
-  List<Edge> getInEdges(Node node) => _edges.where((element) => element.destination == node).toList();
+  List<Edge> getInEdges(Node node) =>
+      _edges.where((element) => element.child == node).toList();
 
   void notifyGraphObserver() => graphObserver.forEach((element) {
         element.notifyGraphInvalidated();
@@ -131,33 +137,23 @@ class Graph {
 
   String toJson() {
     var jsonString = {
-      'nodes': [
-       ..._nodes.map((e) => e.hashCode.toString())
-      ],
+      'nodes': [..._nodes.map((e) => e.hashCode.toString())],
       'edges': [
-        ..._edges.map((e) =>   {'from': e.source.hashCode.toString(), 'to': e.destination.hashCode.toString()})
+        ..._edges.map((e) => {
+              'from': e.houseHold.hashCode.toString(),
+              'to': e.child.hashCode.toString()
+            })
       ]
     };
 
     return json.encode(jsonString);
   }
-
 }
 
 class Node {
-  ValueKey? key;
+  final ValueKey key;
 
-  @Deprecated('Please use the builder and id mechanism to build the widgets')
-  Widget? data;
-
-  @Deprecated('Please use the Node.Id')
-  Node(this.data, {Key? key}) {
-    this.key = ValueKey(key?.hashCode ?? data.hashCode);
-  }
-
-  Node.Id(dynamic id) {
-    key = ValueKey(id);
-  }
+  Node.Id(dynamic id) : key = ValueKey(id);
 
   Size size = Size(0, 0);
 
@@ -180,11 +176,12 @@ class Node {
   }
 
   @override
-  bool operator ==(Object other) => identical(this, other) || other is Node && hashCode == other.hashCode;
+  bool operator ==(Object other) =>
+      identical(this, other) || other is Node && hashCode == other.hashCode;
 
   @override
   int get hashCode {
-    return key?.value.hashCode ?? key.hashCode;
+    return key.value.hashCode;
   }
 
   @override
@@ -193,20 +190,27 @@ class Node {
   }
 }
 
+class HouseholdNode extends Node {
+  HouseholdNode.Id(id, this.husband, this.wife) : super.Id(id);
+  final Node husband;
+  final Node wife;
+}
+
 class Edge {
-  Node source;
-  Node destination;
+  HouseholdNode houseHold;
+  Node child;
 
   Key? key;
   Paint? paint;
 
-  Edge(this.source, this.destination, {this.key, this.paint});
+  Edge(this.houseHold, this.child, {this.key, this.paint});
 
   @override
-  bool operator ==(Object? other) => identical(this, other) || other is Edge && hashCode == other.hashCode;
+  bool operator ==(Object? other) =>
+      identical(this, other) || other is Edge && hashCode == other.hashCode;
 
   @override
-  int get hashCode => key?.hashCode ?? Object.hash(source, destination);
+  int get hashCode => key?.hashCode ?? Object.hash(houseHold, child);
 }
 
 abstract class GraphObserver {
