@@ -32,10 +32,10 @@ class BuchheimWalkerAlgorithm extends Algorithm {
   }
 
   Node getFirstNode(Graph graph) =>
-      graph.nodes.firstWhere((node) => !hasPredecessor(node));
+      graph.generations.firstWhere((node) => !hasPredecessor(node));
 
   void checkUnconnectedNotes(Graph graph) {
-    graph.nodes.forEach((element) {
+    graph.generations.forEach((element) {
       if (getNodeData(element) == null) {
         if (!kReleaseMode) {
           print('$element is not connected to primary ancestor');
@@ -49,6 +49,11 @@ class BuchheimWalkerAlgorithm extends Algorithm {
   }
 
   void firstWalk(Graph graph, Node node, int depth, int number) {
+    if (node is! GenerationNode) {
+      throw Exception(
+          'You somehow manage to create an edge with a node that is not a GenerationNode');
+    }
+
     final nodeData = getNodeData(node)!;
     nodeData.depth = depth;
     nodeData.number = number;
@@ -100,6 +105,11 @@ class BuchheimWalkerAlgorithm extends Algorithm {
   }
 
   void secondWalk(Graph graph, Node node, double modifier) {
+    if (node is! GenerationNode) {
+      throw Exception(
+          'You somehow manage to create an edge with a node that is not a GenerationNode');
+    }
+
     var nodeData = getNodeData(node)!;
     var depth = nodeData.depth;
     var vertical = isVertical();
@@ -110,7 +120,7 @@ class BuchheimWalkerAlgorithm extends Algorithm {
                 depth * configuration.levelSeparation)
             .ceilToDouble());
 
-    setNewNodePosition(node, newNodePosition);
+    _setNewNodePosition(node, newNodePosition);
 
     graph.successorsOf(node).forEach((w) {
       secondWalk(graph, w, modifier + nodeData.modifier);
@@ -123,7 +133,7 @@ class BuchheimWalkerAlgorithm extends Algorithm {
     var right = double.negativeInfinity;
     var bottom = double.negativeInfinity;
 
-    graph.nodes.forEach((node) {
+    graph.generations.forEach((node) {
       left = min(left, node.x);
       top = min(top, node.y);
       right = max(right, node.x + node.width);
@@ -338,12 +348,16 @@ class BuchheimWalkerAlgorithm extends Algorithm {
     var offset = getOffset(graph, doesNeedReverseOrder);
     var nodes = sortByLevel(graph, doesNeedReverseOrder);
     var firstLevel = getNodeData(nodes.first)?.depth ?? 0;
-    var localMaxSize = findMaxSize(filterByLevel(nodes, firstLevel));
     var currentLevel = doesNeedReverseOrder ? firstLevel : 0;
 
     var globalPadding = 0.0;
     var localPadding = 0.0;
     nodes.forEach((node) {
+      if (node is! GenerationNode) {
+        throw Exception(
+            'You somehow manage to create an edge with a node that is not a GenerationNode');
+      }
+
       final depth = getNodeData(node)?.depth ?? 0;
       if (depth != currentLevel) {
         if (doesNeedReverseOrder) {
@@ -353,8 +367,6 @@ class BuchheimWalkerAlgorithm extends Algorithm {
         }
         localPadding = 0.0;
         currentLevel = depth;
-
-        localMaxSize = findMaxSize(filterByLevel(nodes, currentLevel));
       }
 
       final height = node.height;
@@ -368,27 +380,15 @@ class BuchheimWalkerAlgorithm extends Algorithm {
       }
 
       final newNodePosition = getPosition(node, globalPadding, offset);
-      setNewNodePosition(node, newNodePosition);
+      _setNewNodePosition(node, newNodePosition);
     });
   }
 
   void shiftCoordinates(Graph graph, double shiftX, double shiftY) {
-    graph.nodes.forEach((node) {
+    graph.generations.forEach((node) {
       final newNodePosition = (Offset(node.x + shiftX, node.y + shiftY));
-      setNewNodePosition(node, newNodePosition);
+      _setNewNodePosition(node, newNodePosition);
     });
-  }
-
-  Size findMaxSize(List<Node> nodes) {
-    var width = double.negativeInfinity;
-    var height = double.negativeInfinity;
-
-    nodes.forEach((node) {
-      width = max(width, node.width);
-      height = max(height, node.height);
-    });
-
-    return Size(width, height);
   }
 
   Offset getOffset(Graph graph, bool needReverseOrder) {
@@ -399,7 +399,7 @@ class BuchheimWalkerAlgorithm extends Algorithm {
       offsetY = double.minPositive;
     }
 
-    graph.nodes.forEach((node) {
+    graph.generations.forEach((node) {
       if (needReverseOrder) {
         offsetX = min(offsetX, node.x);
         offsetY = max(offsetY, node.y);
@@ -438,7 +438,7 @@ class BuchheimWalkerAlgorithm extends Algorithm {
   }
 
   List<Node> sortByLevel(Graph graph, bool descending) {
-    var nodes = <Node>[...graph.nodes];
+    var nodes = <Node>[...graph.generations];
     if (descending) {
       nodes.reversed;
     }
@@ -453,7 +453,7 @@ class BuchheimWalkerAlgorithm extends Algorithm {
   }
 
   void initData(Graph? graph) {
-    graph?.nodes.forEach((node) {
+    graph?.generations.forEach((node) {
       var nodeDatab = BuchheimWalkerNodeData();
       nodeDatab.ancestor = node;
 
@@ -461,8 +461,8 @@ class BuchheimWalkerAlgorithm extends Algorithm {
     });
 
     graph?.edges.forEach((edge) {
-      nodeData[edge.houseHold]?.successorNodes.add(edge.child);
-      nodeData[edge.child]?.predecessorNodes.add(edge.houseHold);
+      nodeData[edge.ancestors]?.successorNodes.add(edge.descendants);
+      nodeData[edge.descendants]?.predecessorNodes.add(edge.ancestors);
     });
   }
 
@@ -475,7 +475,7 @@ class BuchheimWalkerAlgorithm extends Algorithm {
   bool hasPredecessor(Node node) => predecessorsOf(node).isNotEmpty;
 
   List<Node> successorsOf(Node? node) {
-    return nodeData[node]?.successorNodes ?? [];
+    return (nodeData[node]?.successorNodes ?? []).toSet().toList();
   }
 
   List<Node> predecessorsOf(Node? node) {
@@ -512,15 +512,30 @@ class BuchheimWalkerAlgorithm extends Algorithm {
   @override
   EdgeRenderer get renderer => _edgeRenderer;
 
-  void setNewNodePosition(Node node, Offset newNodePosition) {
+  void _setNewNodePosition(GenerationNode node, Offset newNodePosition) {
+    node.position = newNodePosition;
+
+    for (final innerNode in node.nodes) {
+      newNodePosition = _setNewInnerNodesPosition(innerNode, newNodePosition);
+    }
+  }
+
+  Offset _setNewInnerNodesPosition(Node node, Offset newNodePosition) {
     node.position = newNodePosition;
 
     if (node is HouseholdNode) {
       // updating internal nodes for household node
       node.husband.position = newNodePosition;
-      node.wife.position = Offset(
+
+      newNodePosition = Offset(
           newNodePosition.dx + configuration.houseHoldSeparation,
           newNodePosition.dy);
+      node.wife.position = newNodePosition;
     }
+
+    return Offset(
+      newNodePosition.dx + configuration.siblingSeparation,
+      newNodePosition.dy,
+    );
   }
 }

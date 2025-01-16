@@ -110,22 +110,22 @@ class _FamilyTreeViewPageState extends State<FamilyTreeViewPage> {
     final a = node.key.value as int?;
     final nodeType = node.runtimeType.toString();
 
-    return InkWell(
-      onTap: () {
-        print('clicked');
-      },
-      child: Container(
-          padding: EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.green,
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Text('${nodeType} ${a}')),
-    );
-    // return CircleAvatar(
-    //   radius: 10,
-    //   backgroundColor: Colors.green,
+    // return InkWell(
+    //   onTap: () {
+    //     print('clicked');
+    //   },
+    //   child: Container(
+    //       padding: EdgeInsets.all(16),
+    //       decoration: BoxDecoration(
+    //         color: Colors.green,
+    //         borderRadius: BorderRadius.circular(4),
+    //       ),
+    //       child: Text('${nodeType} ${a}')),
     // );
+    return CircleAvatar(
+      radius: 10,
+      backgroundColor: Colors.green,
+    );
   }
 
   final Graph graph = Graph()..isTree = true;
@@ -133,15 +133,96 @@ class _FamilyTreeViewPageState extends State<FamilyTreeViewPage> {
 
   @override
   void initState() {
-    final husband1 = Node.Id(1);
-    final wife1 = Node.Id(2);
-    final houseHold1 = HouseholdNode.Id(3, husband1, wife1);
-    final child1a = Node.Id(4);
-    final child1b = Node.Id(5);
-    final child1c = Node.Id(6);
-    graph.addEdge(houseHold1, child1a);
-    graph.addEdge(houseHold1, child1b);
-    graph.addEdge(houseHold1, child1c);
+    var i = 0;
+    final husband1 = Node.Id(i);
+    i++;
+
+    final wife1 = Node.Id(i);
+    i++;
+
+    // final husband2 = Node.Id(i);
+    // i++;
+
+    // final wife2 = Node.Id(i);
+    // i++;
+
+    final houseHold1 = HouseholdNode.Id(i, husband1, wife1);
+    i++;
+
+    // final houseHold2 = HouseholdNode.Id(i, husband2, wife2);
+    // i++;
+
+    final generationA = GenerationNode.Id(i, [
+      houseHold1,
+      // houseHold2,
+    ]);
+    i++;
+
+    final child1a = Node.Id(i);
+    i++;
+
+    final child1b = Node.Id(i);
+    i++;
+
+    final child1c = Node.Id(i);
+    i++;
+
+    final wifeChild1c = Node.Id(i);
+    i++;
+
+    final houseHoldChild1c = HouseholdNode.Id(i, child1c, wifeChild1c);
+    i++;
+
+    final generationB = GenerationNode.Id(i, [
+      child1a,
+      child1b,
+      child1c,
+    ]);
+    i++;
+
+    // final child2a = Node.Id(i);
+    // i++;
+
+    // final child2b = Node.Id(i);
+    // i++;
+
+    // final generationC = GenerationNode.Id(i, [
+    //   child2a,
+    //   child2b,
+    // ]);
+
+    graph.addEdge(
+      generationA,
+      generationB,
+      relativeAncestor: houseHold1,
+      relativeDescendant: child1a,
+    );
+    graph.addEdge(
+      generationA,
+      generationB,
+      relativeAncestor: houseHold1,
+      relativeDescendant: child1b,
+    );
+    graph.addEdge(
+      generationA,
+      generationB,
+      relativeAncestor: houseHold1,
+      relativeDescendant: child1c,
+    );
+
+    // graph.addEdge(
+    //   generationB,
+    //   generationC,
+    //   relativeAncestor: houseHoldChild1c,
+    //   relativeDescendant: child2a,
+    // );
+
+    // graph.addEdge(
+    //   generationB,
+    //   generationC,
+    //   relativeAncestor: houseHoldChild1c,
+    //   relativeDescendant: child2b,
+    // );
 
     configuration
       ..siblingSeparation = (100)

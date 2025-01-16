@@ -1,28 +1,20 @@
 part of graphview;
 
 class Graph {
-  final List<Node> _nodes = [];
+  final List<GenerationNode> _generations = [];
   final List<Edge> _edges = [];
   List<GraphObserver> graphObserver = [];
 
-  List<Node> get nodes => _nodes; //  List<Node> nodes = _nodes;
+  List<GenerationNode> get generations =>
+      _generations; //  List<Node> nodes = _nodes;
   List<Edge> get edges => _edges;
 
   var isTree = false;
 
-  int nodeCount() => _nodes.length;
-
-  void addNode(Node node) {
-    // if (!_nodes.contains(node)) {
-    _nodes.add(node);
-    notifyGraphObserver();
-    // }
-  }
-
-  void addNodes(List<Node> nodes) => nodes.forEach((it) => addNode(it));
+  int nodeCount() => _generations.length;
 
   void removeNode(Node? node) {
-    if (!_nodes.contains(node)) {
+    if (!_generations.contains(node)) {
 //            throw IllegalArgumentException("Unable to find node in graph.")
     }
 
@@ -30,17 +22,26 @@ class Graph {
       successorsOf(node).forEach((element) => removeNode(element));
     }
 
-    _nodes.remove(node);
+    _generations.remove(node);
 
-    _edges.removeWhere((edge) => edge.houseHold == node || edge.child == node);
+    _edges.removeWhere(
+        (edge) => edge.ancestors == node || edge.descendants == node);
 
     notifyGraphObserver();
   }
 
   void removeNodes(List<Node> nodes) => nodes.forEach((it) => removeNode(it));
 
-  Edge addEdge(HouseholdNode houseHold, Node child, {Paint? paint}) {
-    final edge = Edge(houseHold, child, paint: paint);
+  Edge addEdge(GenerationNode ancestors, GenerationNode descendants,
+      {Paint? paint,
+      required Node relativeDescendant,
+      required HouseholdNode relativeAncestor}) {
+    final edge = Edge(
+        ancestors: ancestors,
+        descendants: descendants,
+        relativeAncestor: relativeAncestor,
+        relativeDescendant: relativeDescendant,
+        paint: paint);
     addEdgeS(edge);
 
     return edge;
@@ -49,20 +50,20 @@ class Graph {
   void addEdgeS(Edge edge) {
     var sourceSet = false;
     var destinationSet = false;
-    _nodes.forEach((node) {
-      if (!sourceSet && node == edge.houseHold && node is HouseholdNode) {
-        edge.houseHold = node;
+    _generations.forEach((node) {
+      if (!sourceSet && node == edge.ancestors) {
+        edge.ancestors = node;
         sourceSet = true;
-      } else if (!destinationSet && node == edge.child) {
-        edge.child = node;
+      } else if (!destinationSet && node == edge.descendants) {
+        edge.descendants = node;
         destinationSet = true;
       }
     });
     if (!sourceSet) {
-      _nodes.add(edge.houseHold);
+      _generations.add(edge.ancestors);
     }
     if (!destinationSet) {
-      _nodes.add(edge.child);
+      _generations.add(edge.descendants);
     }
 
     if (!_edges.contains(edge)) {
@@ -79,29 +80,32 @@ class Graph {
 
   void removeEdgeFromPredecessor(Node? predecessor, Node? current) {
     _edges.removeWhere(
-        (edge) => edge.houseHold == predecessor && edge.child == current);
+        (edge) => edge.ancestors == predecessor && edge.descendants == current);
   }
 
-  bool hasNodes() => _nodes.isNotEmpty;
+  bool hasNodes() => _generations.isNotEmpty;
 
-  Edge? getEdgeBetween(Node source, Node? destination) =>
-      _edges.firstWhereOrNull((element) =>
-          element.houseHold == source && element.child == destination);
+  Iterable<Edge> getEdgesBetween(Node source, Node? destination) =>
+      _edges.where((element) =>
+          element.ancestors == source && element.descendants == destination);
 
   bool hasSuccessor(Node? node) =>
-      _edges.any((element) => element.houseHold == node);
+      _edges.any((element) => element.ancestors == node);
 
   List<Node> successorsOf(Node? node) =>
-      getOutEdges(node!).map((e) => e.child).toList();
+      getOutEdges(node!).map((e) => e.descendants).toList();
+
+  GenerationNode? getNextGeneration(GenerationNode generation) =>
+      getOutEdges(generation).map((e) => e.descendants).firstOrNull;
 
   bool hasPredecessor(Node node) =>
-      _edges.any((element) => element.child == node);
+      _edges.any((element) => element.descendants == node);
 
   List<Node> predecessorsOf(Node? node) =>
-      getInEdges(node!).map((edge) => edge.houseHold).toList();
+      getInEdges(node!).map((edge) => edge.ancestors).toList();
 
   bool contains({Node? node, Edge? edge}) =>
-      node != null && _nodes.contains(node) ||
+      node != null && _generations.contains(node) ||
       edge != null && _edges.contains(edge);
 
 //  bool contains(Edge edge) => _edges.contains(edge);
@@ -111,25 +115,25 @@ class Graph {
 //            throw IllegalArgumentException("position can't be negative")
     }
 
-    final size = _nodes.length;
+    final size = _generations.length;
     if (position >= size) {
 //            throw IndexOutOfBoundsException("Position: $position, Size: $size")
     }
 
-    return _nodes[position];
+    return _generations[position];
   }
 
   Node getNodeUsingKey(ValueKey key) =>
-      _nodes.firstWhere((element) => element.key == key);
+      _generations.firstWhere((element) => element.key == key);
 
   Node getNodeUsingId(dynamic id) =>
-      _nodes.firstWhere((element) => element.key == ValueKey(id));
+      _generations.firstWhere((element) => element.key == ValueKey(id));
 
   List<Edge> getOutEdges(Node node) =>
-      _edges.where((element) => element.houseHold == node).toList();
+      _edges.where((element) => element.ancestors == node).toList();
 
   List<Edge> getInEdges(Node node) =>
-      _edges.where((element) => element.child == node).toList();
+      _edges.where((element) => element.descendants == node).toList();
 
   void notifyGraphObserver() => graphObserver.forEach((element) {
         element.notifyGraphInvalidated();
@@ -137,11 +141,11 @@ class Graph {
 
   String toJson() {
     var jsonString = {
-      'nodes': [..._nodes.map((e) => e.hashCode.toString())],
+      'nodes': [..._generations.map((e) => e.hashCode.toString())],
       'edges': [
         ..._edges.map((e) => {
-              'from': e.houseHold.hashCode.toString(),
-              'to': e.child.hashCode.toString()
+              'from': e.ancestors.hashCode.toString(),
+              'to': e.descendants.hashCode.toString()
             })
       ]
     };
@@ -196,21 +200,46 @@ class HouseholdNode extends Node {
   final Node wife;
 }
 
+class GenerationNode extends Node {
+  GenerationNode.Id(id, this.nodes) : super.Id(id);
+  List<Node> nodes = [];
+}
+
 class Edge {
-  HouseholdNode houseHold;
-  Node child;
+  GenerationNode ancestors;
+  GenerationNode descendants;
+  HouseholdNode relativeAncestor;
+  Node relativeDescendant;
 
   Key? key;
   Paint? paint;
 
-  Edge(this.houseHold, this.child, {this.key, this.paint});
+  Edge({
+    required this.ancestors,
+    required this.descendants,
+    required this.relativeAncestor,
+    required this.relativeDescendant,
+    this.key,
+    this.paint,
+  });
 
   @override
-  bool operator ==(Object? other) =>
-      identical(this, other) || other is Edge && hashCode == other.hashCode;
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Edge &&
+          hashCode == other.hashCode &&
+          key == other.key &&
+          ancestors == other.ancestors &&
+          descendants == other.descendants &&
+          relativeAncestor == other.relativeAncestor &&
+          relativeDescendant == other.relativeDescendant &&
+          paint == other.paint;
 
   @override
-  int get hashCode => key?.hashCode ?? Object.hash(houseHold, child);
+  int get hashCode =>
+      key?.hashCode ??
+      Object.hash(ancestors, descendants, relativeAncestor, relativeDescendant,
+          key, paint);
 }
 
 abstract class GraphObserver {

@@ -23,21 +23,4 @@ class Home extends StatelessWidget {
       child: FamilyTreeViewPage(),
     );
   }
-
-  Widget createNode(String nodeText) {
-    return Container(
-      padding: EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: Colors.red,
-        border: Border.all(color: Colors.white, width: 1),
-        borderRadius: BorderRadius.circular(30),
-      ),
-      child: Center(
-        child: Text(
-          nodeText,
-          style: TextStyle(fontSize: 10),
-        ),
-      ),
-    );
-  }
 }

@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:collection/collection.dart' show IterableExtension;
+import 'package:graphview/GenerationView.dart';
 import 'package:graphview/HouseholdView.dart';
 
 part 'Graph.dart';
@@ -49,6 +50,13 @@ class GraphView extends StatefulWidget {
 }
 
 class _GraphViewState extends State<GraphView> {
+  late final Size graphSize;
+  @override
+  void initState() {
+    super.initState();
+    graphSize = widget.algorithm.run(widget.graph, 10, 10);
+  }
+
   @override
   Widget build(BuildContext context) {
     return _GraphView(
@@ -62,6 +70,7 @@ class _GraphViewState extends State<GraphView> {
         ..style = PaintingStyle.stroke
         ..strokeCap = StrokeCap.butt,
       builder: widget.builder,
+      graphSize: graphSize,
     );
   }
 }
@@ -71,6 +80,7 @@ class _GraphView extends MultiChildRenderObjectWidget {
   final BuchheimWalkerConfiguration configuration;
   final Algorithm algorithm;
   final Paint paint;
+  final Size graphSize;
 
   _GraphView(
       {Key? key,
@@ -78,13 +88,16 @@ class _GraphView extends MultiChildRenderObjectWidget {
       required this.configuration,
       required this.algorithm,
       required this.paint,
+      required this.graphSize,
       required NodeWidgetBuilder builder})
       : super(
             key: key,
             children: _extractChildren(
                 graph,
+                algorithm,
                 builder,
                 configuration.houseHoldSeparation.toDouble(),
+                configuration.siblingSeparation.toDouble(),
                 algorithm.renderer,
                 paint)) {
     assert(() {
@@ -99,22 +112,27 @@ class _GraphView extends MultiChildRenderObjectWidget {
   }
 
   // Traverses the nodes depth-first collects the list of child widgets that are created.
-  static List<Widget> _extractChildren(Graph graph, NodeWidgetBuilder builder,
-      double houseHoldSeparation, EdgeRenderer renderer, Paint paint) {
+  static List<Widget> _extractChildren(
+      Graph graph,
+      Algorithm algorithm,
+      NodeWidgetBuilder builder,
+      double houseHoldSeparation,
+      double siblingSeparation,
+      EdgeRenderer renderer,
+      Paint edgePaint) {
     final result = <Widget>[];
 
-    graph.nodes.forEach((node) {
-      final widget = node is HouseholdNode
-          ? HouseholdView(
-              husband: node.husband,
-              wife: node.wife,
-              builder: builder,
-              houseHoldSeparation: houseHoldSeparation,
-              renderer: renderer,
-              edgePaint: paint,
-            )
-          : builder(node);
-      result.add(widget);
+    graph.generations.forEach((generation) {
+      result.add(GenerationView(
+        nodes: generation.nodes,
+        builder: builder,
+        graph: graph,
+        algorithm: algorithm,
+        houseHoldSeparation: houseHoldSeparation,
+        siblingSeparation: siblingSeparation,
+        renderer: renderer,
+        edgePaint: edgePaint,
+      ));
     });
 
     return result;
@@ -122,7 +140,7 @@ class _GraphView extends MultiChildRenderObjectWidget {
 
   @override
   RenderCustomLayoutBox createRenderObject(BuildContext context) {
-    return RenderCustomLayoutBox(graph, algorithm, paint);
+    return RenderCustomLayoutBox(graphSize, graph, algorithm, paint);
   }
 
   @override
@@ -142,8 +160,10 @@ class RenderCustomLayoutBox extends RenderBox
   late Graph _graph;
   late Algorithm _algorithm;
   late Paint _paint;
+  final Size graphSize;
 
   RenderCustomLayoutBox(
+    this.graphSize,
     Graph graph,
     Algorithm algorithm,
     Paint? paint, {
@@ -210,7 +230,7 @@ class RenderCustomLayoutBox extends RenderBox
       position++;
     }
 
-    size = algorithm.run(graph, 10, 10);
+    size = graphSize;
 
     child = firstChild;
     position = 0;
