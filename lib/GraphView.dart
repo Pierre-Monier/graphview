@@ -32,6 +32,7 @@ class GraphView extends StatefulWidget {
   final Paint? paint;
   final NodeWidgetBuilder builder;
   final bool animated;
+  final Size nodeSize;
 
   GraphView(
       {Key? key,
@@ -39,10 +40,11 @@ class GraphView extends StatefulWidget {
       required this.configuration,
       this.paint,
       required this.builder,
+      required this.nodeSize,
       this.animated = true})
       : super(key: key) {
-    algorithm =
-        BuchheimWalkerAlgorithm(configuration, TreeEdgeRenderer(configuration));
+    algorithm = BuchheimWalkerAlgorithm(
+        configuration, nodeSize, TreeEdgeRenderer(configuration));
   }
 
   @override
@@ -50,13 +52,6 @@ class GraphView extends StatefulWidget {
 }
 
 class _GraphViewState extends State<GraphView> {
-  late final Size graphSize;
-  @override
-  void initState() {
-    super.initState();
-    graphSize = widget.algorithm.run(widget.graph, 10, 10);
-  }
-
   @override
   Widget build(BuildContext context) {
     return _GraphView(
@@ -70,7 +65,6 @@ class _GraphViewState extends State<GraphView> {
         ..style = PaintingStyle.stroke
         ..strokeCap = StrokeCap.butt,
       builder: widget.builder,
-      graphSize: graphSize,
     );
   }
 }
@@ -80,7 +74,6 @@ class _GraphView extends MultiChildRenderObjectWidget {
   final BuchheimWalkerConfiguration configuration;
   final Algorithm algorithm;
   final Paint paint;
-  final Size graphSize;
 
   _GraphView(
       {Key? key,
@@ -88,18 +81,24 @@ class _GraphView extends MultiChildRenderObjectWidget {
       required this.configuration,
       required this.algorithm,
       required this.paint,
-      required this.graphSize,
       required NodeWidgetBuilder builder})
       : super(
-            key: key,
-            children: _extractChildren(
-                graph,
-                algorithm,
-                builder,
-                configuration.houseHoldSeparation.toDouble(),
-                configuration.siblingSeparation.toDouble(),
-                algorithm.renderer,
-                paint)) {
+          key: key,
+          children: graph.generations
+              .map((generation) => GenerationView(
+                    generation: generation,
+                    builder: builder,
+                    graph: graph,
+                    algorithm: algorithm,
+                    houseHoldSeparation:
+                        configuration.houseHoldSeparation.toDouble(),
+                    siblingSeparation:
+                        configuration.siblingSeparation.toDouble(),
+                    renderer: algorithm.renderer,
+                    edgePaint: paint,
+                  ))
+              .toList(),
+        ) {
     assert(() {
       if (children.isEmpty) {
         throw FlutterError(
@@ -111,36 +110,13 @@ class _GraphView extends MultiChildRenderObjectWidget {
     }());
   }
 
-  // Traverses the nodes depth-first collects the list of child widgets that are created.
-  static List<Widget> _extractChildren(
-      Graph graph,
-      Algorithm algorithm,
-      NodeWidgetBuilder builder,
-      double houseHoldSeparation,
-      double siblingSeparation,
-      EdgeRenderer renderer,
-      Paint edgePaint) {
-    final result = <Widget>[];
-
-    graph.generations.forEach((generation) {
-      result.add(GenerationView(
-        nodes: generation.nodes,
-        builder: builder,
-        graph: graph,
-        algorithm: algorithm,
-        houseHoldSeparation: houseHoldSeparation,
-        siblingSeparation: siblingSeparation,
-        renderer: renderer,
-        edgePaint: edgePaint,
-      ));
-    });
-
-    return result;
-  }
-
   @override
   RenderCustomLayoutBox createRenderObject(BuildContext context) {
-    return RenderCustomLayoutBox(graphSize, graph, algorithm, paint);
+    return RenderCustomLayoutBox(
+      graph: graph,
+      algorithm: algorithm,
+      paint: paint,
+    );
   }
 
   @override
@@ -160,13 +136,11 @@ class RenderCustomLayoutBox extends RenderBox
   late Graph _graph;
   late Algorithm _algorithm;
   late Paint _paint;
-  final Size graphSize;
 
-  RenderCustomLayoutBox(
-    this.graphSize,
-    Graph graph,
-    Algorithm algorithm,
-    Paint? paint, {
+  RenderCustomLayoutBox({
+    required Graph graph,
+    required Algorithm algorithm,
+    required Paint paint,
     List<RenderBox>? children,
   }) {
     _algorithm = algorithm;
@@ -210,6 +184,8 @@ class RenderCustomLayoutBox extends RenderBox
 
   @override
   void performLayout() {
+    size = algorithm.run(graph);
+
     if (childCount == 0) {
       size = constraints.biggest;
       assert(size.isFinite);
@@ -224,13 +200,11 @@ class RenderCustomLayoutBox extends RenderBox
 
       child.layout(looseConstraints, parentUsesSize: true);
       final node = graph.getNodeAtPosition(position);
-      node.size = child.size;
+      // node.size = child.size;
 
       child = nodeBox.nextSibling;
       position++;
     }
-
-    size = graphSize;
 
     child = firstChild;
     position = 0;

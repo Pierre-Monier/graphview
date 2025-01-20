@@ -7,6 +7,9 @@ class BuchheimWalkerAlgorithm extends Algorithm {
   double maxNodeWidth = double.negativeInfinity;
   double maxNodeHeight = double.negativeInfinity;
   BuchheimWalkerConfiguration configuration;
+  @override
+  final Size nodeSize;
+
   late final EdgeRenderer _edgeRenderer;
 
   bool isVertical() {
@@ -19,20 +22,57 @@ class BuchheimWalkerAlgorithm extends Algorithm {
   }
 
   @override
-  Size run(Graph? graph, double shiftX, double shiftY) {
+  Size run(Graph graph) {
     nodeData.clear();
     initData(graph);
-    var firstNode = getFirstNode(graph!);
-    firstWalk(graph, firstNode, 0, 0);
-    secondWalk(graph, firstNode, 0.0);
+
+    var rootGeneration = graph.getFirstNode() as GenerationNode;
+    for (final node in rootGeneration.nodes) {
+      if (node is HouseholdNode) {
+        node.husband.isARelativeDescendant = true;
+        node.wife.isARelativeDescendant = true;
+      } else {
+        node.isARelativeDescendant = true;
+      }
+    }
+    firstWalk(graph, rootGeneration, 0, 0);
+    secondWalk(graph, rootGeneration, 0.0);
     checkUnconnectedNotes(graph);
-    positionNodes(graph);
-    shiftCoordinates(graph, shiftX, shiftY);
-    return calculateGraphSize(graph);
+
+    final graphSize = calculateGraphSize(graph);
+
+    alignFirstGeneration(rootGeneration, graphSize);
+    alignNodes(graph);
+
+    final newGraphSize = calculateGraphSize(graph);
+
+    return newGraphSize;
   }
 
-  Node getFirstNode(Graph graph) =>
-      graph.generations.firstWhere((node) => !hasPredecessor(node));
+  void alignFirstGeneration(GenerationNode firstGeneration, Size graphSize) {
+    // Center the first generation in the middle of the graph
+    final centerOfTheGraph = graphSize.width / 2;
+    final newFirstGenerationPosition = Offset(
+      centerOfTheGraph - firstGeneration.width / 2,
+      firstGeneration.y,
+    );
+
+    _setNewNodePosition(firstGeneration, newFirstGenerationPosition);
+  }
+
+  void alignNodes(Graph graph) {
+    // Align each descendant to the center of its ancestors
+    for (final edge in graph.edges) {
+      final centerOfAncestors =
+          edge.relativeAncestor.position.dx + (edge.relativeAncestor.width / 2);
+      final newDescendantPosition = Offset(
+        centerOfAncestors - edge.descendants.width / 2,
+        edge.descendants.position.dy,
+      );
+
+      _setNewNodePosition(edge.descendants, newDescendantPosition);
+    }
+  }
 
   void checkUnconnectedNotes(Graph graph) {
     graph.generations.forEach((element) {
@@ -51,7 +91,8 @@ class BuchheimWalkerAlgorithm extends Algorithm {
   void firstWalk(Graph graph, Node node, int depth, int number) {
     if (node is! GenerationNode) {
       throw Exception(
-          'You somehow manage to create an edge with a node that is not a GenerationNode');
+        'You somehow manage to create an edge with a node that is not a GenerationNode',
+      );
     }
 
     final nodeData = getNodeData(node)!;
@@ -62,17 +103,8 @@ class BuchheimWalkerAlgorithm extends Algorithm {
     maxNodeWidth = max(maxNodeWidth, node.width);
     maxNodeHeight = max(maxNodeHeight, node.height);
 
-    if (isLeaf(graph, node)) {
-      // if the node has no left sibling, prelim(node) should be set to 0, but we don't have to set it
-      // here, because it's already initialized with 0
-      if (hasLeftSibling(graph, node)) {
-        final leftSibling = getLeftSibling(graph, node);
-        nodeData.prelim =
-            getPrelim(leftSibling) + getSpacing(graph, leftSibling, node);
-      }
-    } else {
+    if (!isLeaf(graph, node)) {
       final leftMost = getLeftMostChild(graph, node);
-      final rightMost = getRightMostChild(graph, node);
       var defaultAncestor = leftMost;
 
       Node? next = leftMost;
@@ -85,22 +117,6 @@ class BuchheimWalkerAlgorithm extends Algorithm {
       }
 
       executeShifts(graph, node);
-
-      var vertical = isVertical();
-      var midPoint = 0.5 *
-          ((getPrelim(leftMost) +
-                  getPrelim(rightMost) +
-                  (vertical ? rightMost!.width : rightMost!.height)) -
-              (vertical ? node.width : node.height));
-
-      if (hasLeftSibling(graph, node)) {
-        final leftSibling = getLeftSibling(graph, node);
-        nodeData.prelim =
-            getPrelim(leftSibling) + getSpacing(graph, leftSibling, node);
-        nodeData.modifier = nodeData.prelim - midPoint;
-      } else {
-        nodeData.prelim = midPoint;
-      }
     }
   }
 
@@ -384,13 +400,6 @@ class BuchheimWalkerAlgorithm extends Algorithm {
     });
   }
 
-  void shiftCoordinates(Graph graph, double shiftX, double shiftY) {
-    graph.generations.forEach((node) {
-      final newNodePosition = (Offset(node.x + shiftX, node.y + shiftY));
-      _setNewNodePosition(node, newNodePosition);
-    });
-  }
-
   Offset getOffset(Graph graph, bool needReverseOrder) {
     var offsetX = double.infinity;
     var offsetY = double.infinity;
@@ -452,18 +461,36 @@ class BuchheimWalkerAlgorithm extends Algorithm {
     return nodes.where((node) => getNodeData(node)?.depth == level).toList();
   }
 
-  void initData(Graph? graph) {
-    graph?.generations.forEach((node) {
-      var nodeDatab = BuchheimWalkerNodeData();
-      nodeDatab.ancestor = node;
+  void initData(Graph graph) {
+    HouseholdNode.householdSeparation =
+        configuration.houseHoldSeparation.toDouble();
+    GenerationNode.siblingSeparation =
+        configuration.siblingSeparation.toDouble();
 
-      nodeData[node] = nodeDatab;
+    graph.generations.forEach((generation) {
+      var nodeDatab = BuchheimWalkerNodeData();
+      nodeDatab.ancestor = generation;
+
+      nodeData[generation] = nodeDatab;
+
+      setNodesSize(generation);
     });
 
-    graph?.edges.forEach((edge) {
+    graph.edges.forEach((edge) {
       nodeData[edge.ancestors]?.successorNodes.add(edge.descendants);
       nodeData[edge.descendants]?.predecessorNodes.add(edge.ancestors);
     });
+  }
+
+  void setNodesSize(GenerationNode generation) {
+    for (final node in generation.nodes) {
+      if (node is HouseholdNode) {
+        node.husband.size = nodeSize;
+        node.wife.size = nodeSize;
+      } else {
+        node.size = nodeSize;
+      }
+    }
   }
 
   BuchheimWalkerNodeData? getNodeData(Node? node) {
@@ -482,7 +509,11 @@ class BuchheimWalkerAlgorithm extends Algorithm {
     return nodeData[node]?.predecessorNodes ?? [];
   }
 
-  BuchheimWalkerAlgorithm(this.configuration, EdgeRenderer? renderer) {
+  BuchheimWalkerAlgorithm(
+    this.configuration,
+    this.nodeSize,
+    EdgeRenderer? renderer,
+  ) {
     _edgeRenderer = renderer ?? TreeEdgeRenderer(configuration);
   }
 
@@ -496,7 +527,7 @@ class BuchheimWalkerAlgorithm extends Algorithm {
 
   @override
   void step(Graph? graph) {
-    var firstNode = getFirstNode(graph!);
+    var firstNode = graph!.getFirstNode();
     firstWalk(graph, firstNode, 0, 0);
     secondWalk(graph, firstNode, 0.0);
     checkUnconnectedNotes(graph);
@@ -528,13 +559,20 @@ class BuchheimWalkerAlgorithm extends Algorithm {
       node.husband.position = newNodePosition;
 
       newNodePosition = Offset(
-          newNodePosition.dx + configuration.houseHoldSeparation,
+          newNodePosition.dx +
+              configuration.houseHoldSeparation +
+              node.husband.width,
           newNodePosition.dy);
       node.wife.position = newNodePosition;
+
+      return Offset(
+        node.wife.x + node.wife.width + configuration.siblingSeparation,
+        node.wife.y,
+      );
     }
 
     return Offset(
-      newNodePosition.dx + configuration.siblingSeparation,
+      newNodePosition.dx + node.width + configuration.siblingSeparation,
       newNodePosition.dy,
     );
   }

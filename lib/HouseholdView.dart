@@ -121,17 +121,15 @@ class _RenderHouseHold extends RenderBox
     }
 
     husbandRenderBox.layout(looseConstraints, parentUsesSize: true);
-    husband.size = husbandRenderBox.size;
-    husbandParentData.offset = husband.position;
+    husbandParentData.offset = Offset(0, 0);
 
     wifeRenderBox.layout(looseConstraints, parentUsesSize: true);
-    wife.size = wifeRenderBox.size;
-    wifeParentData.offset = wife.position;
+    wifeParentData.offset = Offset(husband.width + houseHoldSeparation, 0);
 
     size = Size(
         husbandRenderBox.size.width +
-            wifeRenderBox.size.width +
-            houseHoldSeparation,
+            houseHoldSeparation +
+            wifeRenderBox.size.width,
         max(husband.size.height, wife.size.height));
 
     print(size);
@@ -142,8 +140,13 @@ class _RenderHouseHold extends RenderBox
     context.canvas.save();
     context.canvas.translate(offset.dx, offset.dy);
 
-    algorithm.renderer
-        .renderHouseHoldEdge(context.canvas, husband, wife, edgePaint);
+    algorithm.renderer.renderHouseHoldEdge(
+      context.canvas,
+      husband,
+      wife,
+      houseHoldSeparation,
+      edgePaint,
+    );
 
     context.canvas.restore();
 

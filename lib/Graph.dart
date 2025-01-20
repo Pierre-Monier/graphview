@@ -5,11 +5,12 @@ class Graph {
   final List<Edge> _edges = [];
   List<GraphObserver> graphObserver = [];
 
-  List<GenerationNode> get generations =>
-      _generations; //  List<Node> nodes = _nodes;
+  List<GenerationNode> get generations => _generations;
   List<Edge> get edges => _edges;
 
   var isTree = false;
+
+  Graph();
 
   int nodeCount() => _generations.length;
 
@@ -32,6 +33,24 @@ class Graph {
 
   void removeNodes(List<Node> nodes) => nodes.forEach((it) => removeNode(it));
 
+  void setEdges(List<Edge> edges) {
+    _edges.clear();
+    addEdges(edges);
+
+    var rootGeneration = getFirstNode() as GenerationNode;
+    for (final node in rootGeneration.nodes) {
+      if (node is HouseholdNode) {
+        node.husband.isARelativeDescendant = true;
+        node.wife.isARelativeDescendant = true;
+      } else {
+        node.isARelativeDescendant = true;
+      }
+    }
+  }
+
+  Node getFirstNode() =>
+      generations.firstWhere((node) => !hasPredecessor(node));
+
   Edge addEdge(GenerationNode ancestors, GenerationNode descendants,
       {Paint? paint,
       required Node relativeDescendant,
@@ -50,6 +69,7 @@ class Graph {
   void addEdgeS(Edge edge) {
     var sourceSet = false;
     var destinationSet = false;
+    edge.relativeDescendant.isARelativeDescendant = true;
     _generations.forEach((node) {
       if (!sourceSet && node == edge.ancestors) {
         edge.ancestors = node;
@@ -95,8 +115,8 @@ class Graph {
   List<Node> successorsOf(Node? node) =>
       getOutEdges(node!).map((e) => e.descendants).toList();
 
-  GenerationNode? getNextGeneration(GenerationNode generation) =>
-      getOutEdges(generation).map((e) => e.descendants).firstOrNull;
+  List<GenerationNode> getNextGenerations(GenerationNode generation) =>
+      getOutEdges(generation).map((e) => e.descendants).toSet().toList();
 
   bool hasPredecessor(Node node) =>
       _edges.any((element) => element.descendants == node);
@@ -171,6 +191,8 @@ class Node {
 
   double get y => position.dy;
 
+  var isARelativeDescendant = false;
+
   set y(double value) {
     position = Offset(position.dx, value);
   }
@@ -198,11 +220,35 @@ class HouseholdNode extends Node {
   HouseholdNode.Id(id, this.husband, this.wife) : super.Id(id);
   final Node husband;
   final Node wife;
+
+  static double householdSeparation = 0.0;
+
+  @override
+  Size get size {
+    // maybe cache this to avoid unecessary calculations
+    return Size(husband.width + householdSeparation + wife.width,
+        max(husband.height, wife.height));
+  }
 }
 
 class GenerationNode extends Node {
   GenerationNode.Id(id, this.nodes) : super.Id(id);
   List<Node> nodes = [];
+  static double siblingSeparation = 0.0;
+
+  @override
+  Size get size {
+    final sizes = nodes.map((node) => node.size);
+    final width = sizes.fold<double>(
+            0, (previousValue, element) => previousValue + element.width) +
+        (nodes.length - 1) * siblingSeparation;
+    final height = sizes.fold<double>(
+      0,
+      (previousValue, element) => max(previousValue, element.height),
+    );
+
+    return Size(width, height);
+  }
 }
 
 class Edge {
