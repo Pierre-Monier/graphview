@@ -35,6 +35,7 @@ class Graph {
 
   void setEdges(List<Edge> edges) {
     _edges.clear();
+    _generations.clear();
     addEdges(edges);
 
     var rootGeneration = getFirstNode() as GenerationNode;
@@ -46,6 +47,8 @@ class Graph {
         node.isARelativeDescendant = true;
       }
     }
+
+    notifyGraphObserver();
   }
 
   Node getFirstNode() =>
@@ -88,7 +91,6 @@ class Graph {
 
     if (!_edges.contains(edge)) {
       _edges.add(edge);
-      notifyGraphObserver();
     }
   }
 

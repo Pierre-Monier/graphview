@@ -53,6 +53,14 @@ class GraphView extends StatefulWidget {
 
 class _GraphViewState extends State<GraphView> {
   @override
+  void initState() {
+    super.initState();
+    widget.graph.graphObserver.add(_GraphUIObserver(() {
+      setState(() {});
+    }));
+  }
+
+  @override
   Widget build(BuildContext context) {
     return _GraphView(
       key: widget.key,
@@ -199,8 +207,6 @@ class RenderCustomLayoutBox extends RenderBox
       final nodeBox = child.parentData as NodeBoxData;
 
       child.layout(looseConstraints, parentUsesSize: true);
-      final node = graph.getNodeAtPosition(position);
-      // node.size = child.size;
 
       child = nodeBox.nextSibling;
       position++;
@@ -212,7 +218,6 @@ class RenderCustomLayoutBox extends RenderBox
       final node = child.parentData as NodeBoxData;
 
       node.offset = graph.getNodeAtPosition(position).position;
-
       child = node.nextSibling;
       position++;
     }
@@ -245,3 +250,14 @@ class RenderCustomLayoutBox extends RenderBox
 }
 
 class NodeBoxData extends ContainerBoxParentData<RenderBox> {}
+
+class _GraphUIObserver extends GraphObserver {
+  final void Function() onGraphInvalidated;
+
+  _GraphUIObserver(this.onGraphInvalidated);
+
+  @override
+  void notifyGraphInvalidated() {
+    onGraphInvalidated();
+  }
+}

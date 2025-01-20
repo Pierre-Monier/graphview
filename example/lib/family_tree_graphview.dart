@@ -17,19 +17,17 @@ class _FamilyTreeViewPageState extends State<FamilyTreeViewPage> {
     return Scaffold(
         appBar: AppBar(),
         body: Center(
-          child: InteractiveViewer(
-            child: GraphView(
-              nodeSize: Size(50, 50),
-              graph: graph,
-              configuration: configuration,
-              paint: Paint()
-                ..color = Colors.green
-                ..strokeWidth = 1
-                ..style = PaintingStyle.stroke,
-              builder: (Node node) {
-                return rectangleWidget(node);
-              },
-            ),
+          child: GraphView(
+            nodeSize: Size(50, 50),
+            graph: graph,
+            configuration: configuration,
+            paint: Paint()
+              ..color = Colors.green
+              ..strokeWidth = 1
+              ..style = PaintingStyle.stroke,
+            builder: (Node node) {
+              return rectangleWidget(node);
+            },
           ),
         ));
   }
@@ -37,16 +35,21 @@ class _FamilyTreeViewPageState extends State<FamilyTreeViewPage> {
   Random r = Random();
 
   Widget rectangleWidget(Node node) {
-    return CircleAvatar(
-      radius: 40,
-      backgroundColor: node.isARelativeDescendant ? Colors.green : Colors.red,
-      child: Text(node.key.value.toString()),
+    return InkWell(
+      onTap: () {
+        graph.setEdges(_renderThreeGenerationFamily(r.nextInt(50)));
+      },
+      child: CircleAvatar(
+        radius: 40,
+        backgroundColor: node.isARelativeDescendant ? Colors.green : Colors.red,
+        child: Text(node.key.value.toString()),
+      ),
     );
   }
 
   @override
   void initState() {
-    graph.setEdges(_renderThreeGenerationFamily());
+    graph.setEdges(_renderThreeGenerationFamily(0));
 
     configuration
       ..siblingSeparation = (100)
@@ -58,8 +61,8 @@ class _FamilyTreeViewPageState extends State<FamilyTreeViewPage> {
     super.initState();
   }
 
-  List<Edge> _renderThreeGenerationFamily() {
-    var i = 0;
+  List<Edge> _renderThreeGenerationFamily(int initialId) {
+    var i = initialId;
     final husband1 = Node.Id(i);
     i++;
 
