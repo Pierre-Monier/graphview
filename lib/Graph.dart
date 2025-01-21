@@ -8,7 +8,7 @@ class Graph {
   List<GenerationNode> get generations => _generations;
   List<Edge> get edges => _edges;
 
-  var isTree = false;
+  final isTree = true;
 
   Graph();
 
@@ -36,7 +36,7 @@ class Graph {
   void setEdges(List<Edge> edges) {
     _edges.clear();
     _generations.clear();
-    addEdges(edges);
+    _addEdges(edges);
 
     var rootGeneration = getFirstNode() as GenerationNode;
     for (final node in rootGeneration.nodes) {
@@ -54,22 +54,7 @@ class Graph {
   Node getFirstNode() =>
       generations.firstWhere((node) => !hasPredecessor(node));
 
-  Edge addEdge(GenerationNode ancestors, GenerationNode descendants,
-      {Paint? paint,
-      required Node relativeDescendant,
-      required HouseholdNode relativeAncestor}) {
-    final edge = Edge(
-        ancestors: ancestors,
-        descendants: descendants,
-        relativeAncestor: relativeAncestor,
-        relativeDescendant: relativeDescendant,
-        paint: paint);
-    addEdgeS(edge);
-
-    return edge;
-  }
-
-  void addEdgeS(Edge edge) {
+  void _addEdgeS(Edge edge) {
     var sourceSet = false;
     var destinationSet = false;
     edge.relativeDescendant.isARelativeDescendant = true;
@@ -94,16 +79,7 @@ class Graph {
     }
   }
 
-  void addEdges(List<Edge> edges) => edges.forEach((it) => addEdgeS(it));
-
-  void removeEdge(Edge edge) => _edges.remove(edge);
-
-  void removeEdges(List<Edge> edges) => edges.forEach((it) => removeEdge(it));
-
-  void removeEdgeFromPredecessor(Node? predecessor, Node? current) {
-    _edges.removeWhere(
-        (edge) => edge.ancestors == predecessor && edge.descendants == current);
-  }
+  void _addEdges(List<Edge> edges) => edges.forEach((it) => _addEdgeS(it));
 
   bool hasNodes() => _generations.isNotEmpty;
 

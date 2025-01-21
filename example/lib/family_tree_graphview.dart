@@ -9,7 +9,7 @@ class FamilyTreeViewPage extends StatefulWidget {
 }
 
 class _FamilyTreeViewPageState extends State<FamilyTreeViewPage> {
-  final Graph graph = Graph()..isTree = true;
+  final Graph graph = Graph();
   BuchheimWalkerConfiguration configuration = BuchheimWalkerConfiguration();
 
   @override
